@@ -75,7 +75,7 @@ def make_pretty_plot(time, EKF_x_hist, h_k, s_k, Cb_k):
     '''
     Temp
     '''
-    fig, ax = plt.subplots((3))
+    _, ax = plt.subplots((3))
     ax[0].plot(time, EKF_x_hist[:, 0], color='g', label='Estimate')
     ax[0].plot(time, h_k, color='y', label='True Value')
     ax[1].plot(time, EKF_x_hist[:, 1], color='g', label='Estimate')
