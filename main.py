@@ -71,16 +71,95 @@ def EKF(y, x0, P0, Q, R):
 
     return x_hist
 
-def make_pretty_plot(time, EKF_x_hist, h_k, s_k, Cb_k):
+def SP_UKF(y, x0, P0, Q, R):
+    '''
+    Temp
+    '''
+    x_hist = np.zeros((len(y), 3))
+    x_km1_km1 = x0
+    P_km1_km1 = P0
+    alpha = 0.5
+    beta = 2
+    kappa = 0.5
+    nx = 3
+    lamb = alpha**2 * (nx + kappa) - nx
+
+    for i, y_k in enumerate(y):
+        if i == 0:
+            x_hist[0, :] = np.atleast_2d(x0).T
+        else:
+            # Prediction Step
+            x_aug = np.block([[x_km1_km1], [np.zeros((3, 1))], [0]])
+            P_aug = np.block([[P_km1_km1, np.zeros((3, 4))], 
+                              [np.zeros((3, 3)), Q, np.zeros((3, 1))], 
+                              [np.zeros((1, 6)), R]])
+            na = P_aug.shape[0]
+            # Prior state sigma points
+            chi_plus_k_km1 = []
+            chi_minus_k_km1 = []
+            w_vec = []
+            w0m = lamb / (na + lamb)
+            w0c = lamb / (na + lamb) + (1 - alpha**2 + beta)
+            for i in np.arange(0, na):
+                P_aug_temp = np.atleast_2d(P_aug[:, i]).T
+                chi_plus = x_aug + np.sqrt((na + lamb) * P_aug_temp)
+                chi_minus = x_aug - np.sqrt((na + lamb) * P_aug_temp)
+                chi_plus_k_km1.append(f_km1_build(chi_plus[0][0], chi_plus[1][0], chi_plus[2][0]))
+                chi_minus_k_km1.append(f_km1_build(chi_minus[0][0], chi_minus[1][0], chi_minus[2][0]))
+                w_vec.append(1 / (2 * (na + lamb)))
+            # Prior state
+            x_k_km1 = w0m * x_aug[0:3]
+            for (chi_p_k_km1, chi_m_k_km1, w) in zip(chi_plus_k_km1, chi_minus_k_km1, w_vec):
+                x_k_km1 += w * chi_p_k_km1[0:3] + w * chi_m_k_km1[0:3]
+            # Prior covariance
+            P_k_km1 = w0c * (x_aug[0:3] - x_k_km1) @ (x_aug[0:3] - x_k_km1).T
+            for (chi_p_k_km1, chi_m_k_km1, w) in zip(chi_plus_k_km1, chi_minus_k_km1, w_vec):
+                P_k_km1 = w * (chi_p_k_km1[0:3] - x_k_km1) @ (chi_p_k_km1[0:3] - x_k_km1).T \
+                        + w * (chi_m_k_km1[0:3] - x_k_km1) @ (chi_m_k_km1[0:3] - x_k_km1).T
+            
+            # Correction Step
+            # Expected measurement
+            y_k_est = w0m * np.sqrt(d**2 + x_k_km1[0][0]**2) 
+            for (chi_p_k_km1, chi_m_k_km1, w) in zip(chi_plus_k_km1, chi_minus_k_km1, w_vec):
+                y_k_est += w * np.sqrt(d**2 + chi_p_k_km1[0][0]**2) \
+                           + w * np.sqrt(d**2 + chi_m_k_km1[0][0]**2)
+            # Approximate innovation covariance
+            P_y = w0c * (np.sqrt(d**2 + x_k_km1[0][0]**2) - y_k_est) \
+                        * (np.sqrt(d**2 + x_k_km1[0][0]**2) - y_k_est).T
+            # Approximate state-measurement cross-covariance
+            P_xy = w0c * (x_aug[0:3] - x_k_km1) \
+                         * (np.sqrt(d**2 + x_k_km1[0][0]**2) - y_k_est).T
+            for (chi_p_k_km1, chi_m_k_km1, w) in zip(chi_plus_k_km1, chi_minus_k_km1, w_vec):
+                P_y += w * (np.sqrt(d**2 + chi_p_k_km1[0][0]**2) - y_k_est) \
+                        * (np.sqrt(d**2 + chi_p_k_km1[0][0]**2) - y_k_est).T
+                P_y += w * (np.sqrt(d**2 + chi_m_k_km1[0][0]**2) - y_k_est) \
+                        * (np.sqrt(d**2 + chi_m_k_km1[0][0]**2) - y_k_est).T
+                P_xy += w * (chi_p_k_km1[0:3] - x_k_km1) \
+                         * (np.sqrt(d**2 + chi_p_k_km1[0][0]**2) - y_k_est).T
+                P_xy += w * (chi_m_k_km1[0:3] - x_k_km1) \
+                         * (np.sqrt(d**2 + chi_m_k_km1[0][0]**2) - y_k_est).T
+                pass
+            K_k = P_xy * P_y**-1
+            x_k_k = x_k_km1 + K_k * (y_k - y_k_est)
+            P_k_k = P_k_km1 - K_k * P_y @ K_k.T
+
+            # Saving and reseting values
+            x_hist[i, :] = np.atleast_2d(x_k_k).T
+            x_km1_km1 = x_k_k
+            P_km1_km1 = P_k_k
+
+    return x_hist
+
+def make_pretty_plot(time, x_hist, h_k, s_k, Cb_k):
     '''
     Temp
     '''
     _, ax = plt.subplots((3))
-    ax[0].plot(time, EKF_x_hist[:, 0], color='g', label='Estimate')
+    ax[0].plot(time, x_hist[:, 0], color='g', label='Estimate')
     ax[0].plot(time, h_k, color='y', label='True Value')
-    ax[1].plot(time, EKF_x_hist[:, 1], color='g', label='Estimate')
+    ax[1].plot(time, x_hist[:, 1], color='g', label='Estimate')
     ax[1].plot(time, s_k, color='y', label='True Value')
-    ax[2].plot(time, EKF_x_hist[:, 2], color='g', label='Estimate')
+    ax[2].plot(time, x_hist[:, 2], color='g', label='Estimate')
     ax[2].plot(time, Cb_k, color='y', label='True Value')
     ax[0].legend()
     ax[1].legend()
@@ -113,9 +192,11 @@ def main():
     x0 = np.array([[400_000], [-2_000], [20]])  # [[ft], [ft/s], [lb/ft^2]]
     P0 = np.diagflat((100**2, 10**2, 1**2))     # [ft^2, ft^2/s^2, lb^2/ft^2]
 
-    EKF_x_hist = EKF(y_k, x0, P0, Q, R)
+    # EKF_x_hist = EKF(y_k, x0, P0, Q, R)
+    SP_UKF_x_hist = SP_UKF(y_k, x0, P0, Q, R)
 
-    make_pretty_plot(time, EKF_x_hist, h_k, s_k, Cb_k)
+    # make_pretty_plot(time, EKF_x_hist, h_k, s_k, Cb_k)
+    make_pretty_plot(time, SP_UKF_x_hist, h_k, s_k, Cb_k)
 
     return 0
 
