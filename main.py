@@ -1,8 +1,9 @@
 # Optimal Estimation - HW5 - Ballistic Vehicle Altimetry System Design
 
 import numpy as np
-import numpy.linalg as la
+import numpy.linalg as npla
 import scipy as sp
+import scipy.linalg as spla
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 
@@ -71,6 +72,43 @@ def EKF(y, x0, P0, Q, R):
 
     return x_hist
 
+def calc_sg_pts(x_aug, P_aug):
+    '''
+    Temp
+    '''
+    alpha = 1
+    beta = 2
+    kappa = 0
+    na = P_aug.shape[0]
+    lamb = alpha**2 * (na + kappa) - na
+    sg_pts = []
+    wm_vec = []
+    wc_vec = []
+    sg_pts.append(x_aug)
+    wm_vec.append(lamb / (na + lamb))
+    wc_vec.append(lamb / (na + lamb) + (1 - alpha**2 + beta))
+    P_aug_sqrt = spla.sqrtm((na + lamb) * P_aug)
+    for i in np.arange(0, na):
+        P_j_col = np.atleast_2d(P_aug_sqrt[:, i]).T
+        sg_p = x_aug + P_j_col
+        sg_pts.append(sg_p)
+        sg_m = x_aug - P_j_col
+        sg_pts.append(sg_m)
+        wm_vec.append(1 / (2 * (na + lamb)))
+        wc_vec.append(1 / (2 * (na + lamb)))
+        wm_vec.append(1 / (2 * (na + lamb)))
+        wc_vec.append(1 / (2 * (na + lamb)))
+    return sg_pts, wm_vec, wc_vec
+
+def prop_sg_pts(sg_pts):
+    p_sg_pts = []
+    for sg_pt in sg_pts:
+        h = sg_pt[0][0]
+        s = sg_pt[1][0]
+        Cb = sg_pt[2][0]
+        p_sg_pts.append(f_km1_build(h, s, Cb))
+    return p_sg_pts
+
 def SP_UKF(y, x0, P0, Q, R):
     '''
     Temp
@@ -78,11 +116,6 @@ def SP_UKF(y, x0, P0, Q, R):
     x_hist = np.zeros((len(y), 3))
     x_km1_km1 = x0
     P_km1_km1 = P0
-    alpha = 0.5
-    beta = 2
-    kappa = 0.5
-    nx = 3
-    lamb = alpha**2 * (nx + kappa) - nx
 
     for i, y_k in enumerate(y):
         if i == 0:
@@ -93,51 +126,39 @@ def SP_UKF(y, x0, P0, Q, R):
             P_aug = np.block([[P_km1_km1, np.zeros((3, 4))], 
                               [np.zeros((3, 3)), Q, np.zeros((3, 1))], 
                               [np.zeros((1, 6)), R]])
-            na = P_aug.shape[0]
             # Prior state sigma points
-            chi_plus_k_km1 = []
-            chi_minus_k_km1 = []
-            w_vec = []
-            w0m = lamb / (na + lamb)
-            w0c = lamb / (na + lamb) + (1 - alpha**2 + beta)
-            for i in np.arange(0, na):
-                P_aug_temp = np.atleast_2d(P_aug[:, i]).T
-                chi_plus = x_aug + np.sqrt((na + lamb) * P_aug_temp)
-                chi_minus = x_aug - np.sqrt((na + lamb) * P_aug_temp)
-                chi_plus_k_km1.append(f_km1_build(chi_plus[0][0], chi_plus[1][0], chi_plus[2][0]))
-                chi_minus_k_km1.append(f_km1_build(chi_minus[0][0], chi_minus[1][0], chi_minus[2][0]))
-                w_vec.append(1 / (2 * (na + lamb)))
+            sg_pts, wm_vec, wc_vec = calc_sg_pts(x_aug, P_aug)
             # Prior state
-            x_k_km1 = w0m * x_aug[0:3]
-            for (chi_p_k_km1, chi_m_k_km1, w) in zip(chi_plus_k_km1, chi_minus_k_km1, w_vec):
-                x_k_km1 += w * chi_p_k_km1[0:3] + w * chi_m_k_km1[0:3]
+            x_k_km1 = 0
+            for (sg_pt, w) in zip(sg_pts, wm_vec):
+                x_k_km1 += w * np.real(sg_pt[0:3])
+            # Propogate sigma point states
+            p_sg_pts = prop_sg_pts(sg_pts)
             # Prior covariance
-            P_k_km1 = w0c * (x_aug[0:3] - x_k_km1) @ (x_aug[0:3] - x_k_km1).T
-            for (chi_p_k_km1, chi_m_k_km1, w) in zip(chi_plus_k_km1, chi_minus_k_km1, w_vec):
-                P_k_km1 = w * (chi_p_k_km1[0:3] - x_k_km1) @ (chi_p_k_km1[0:3] - x_k_km1).T \
-                        + w * (chi_m_k_km1[0:3] - x_k_km1) @ (chi_m_k_km1[0:3] - x_k_km1).T
+            P_k_km1 = np.zeros((3, 3))
+            for (sg_pt, w) in zip(p_sg_pts, wc_vec):
+                P_k_km1 += w * (sg_pt[0:3] - x_k_km1) @ (sg_pt[0:3] - x_k_km1).T
             
             # Correction Step
+            x_aug_c = np.block([[x_k_km1], [np.zeros((3, 1))], [0]])
+            P_aug_c = np.block([[P_k_km1, np.zeros((3, 4))], 
+                                [np.zeros((3, 3)), Q, np.zeros((3, 1))], 
+                                [np.zeros((1, 6)), R]])
+            # Generate new sigma points
+            sg_pts_c, wm_vec_c, wc_vec_c = calc_sg_pts(x_aug_c, P_aug_c)
             # Expected measurement
-            y_k_est = w0m * np.sqrt(d**2 + x_k_km1[0][0]**2) 
-            for (chi_p_k_km1, chi_m_k_km1, w) in zip(chi_plus_k_km1, chi_minus_k_km1, w_vec):
-                y_k_est += w * np.sqrt(d**2 + chi_p_k_km1[0][0]**2) \
-                           + w * np.sqrt(d**2 + chi_m_k_km1[0][0]**2)
+            y_k_est = 0
+            for (sg_pt_c, w_c) in zip(sg_pts_c, wm_vec_c):
+                y_k_est += w_c * np.sqrt(d**2 + sg_pt_c[0][0]**2)
             # Approximate innovation covariance
-            P_y = w0c * (np.sqrt(d**2 + x_k_km1[0][0]**2) - y_k_est) \
-                        * (np.sqrt(d**2 + x_k_km1[0][0]**2) - y_k_est).T
+            P_y = 0
             # Approximate state-measurement cross-covariance
-            P_xy = w0c * (x_aug[0:3] - x_k_km1) \
-                         * (np.sqrt(d**2 + x_k_km1[0][0]**2) - y_k_est).T
-            for (chi_p_k_km1, chi_m_k_km1, w) in zip(chi_plus_k_km1, chi_minus_k_km1, w_vec):
-                P_y += w * (np.sqrt(d**2 + chi_p_k_km1[0][0]**2) - y_k_est) \
-                        * (np.sqrt(d**2 + chi_p_k_km1[0][0]**2) - y_k_est).T
-                P_y += w * (np.sqrt(d**2 + chi_m_k_km1[0][0]**2) - y_k_est) \
-                        * (np.sqrt(d**2 + chi_m_k_km1[0][0]**2) - y_k_est).T
-                P_xy += w * (chi_p_k_km1[0:3] - x_k_km1) \
-                         * (np.sqrt(d**2 + chi_p_k_km1[0][0]**2) - y_k_est).T
-                P_xy += w * (chi_m_k_km1[0:3] - x_k_km1) \
-                         * (np.sqrt(d**2 + chi_m_k_km1[0][0]**2) - y_k_est).T
+            P_xy = np.zeros((3, 1))
+            for (sg_pt_c, w_c) in zip(sg_pts_c, wc_vec_c):
+                P_y += w_c * (np.sqrt(d**2 + sg_pt_c[0][0]**2) - y_k_est) \
+                        * (np.sqrt(d**2 + sg_pt_c[0][0]**2) - y_k_est).T
+                P_xy += w_c * (sg_pt_c[0:3] - x_k_km1) \
+                         * (np.sqrt(d**2 + sg_pt_c[0][0]**2) - y_k_est).T
                 pass
             K_k = P_xy * P_y**-1
             x_k_k = x_k_km1 + K_k * (y_k - y_k_est)
@@ -148,6 +169,31 @@ def SP_UKF(y, x0, P0, Q, R):
             x_km1_km1 = x_k_k
             P_km1_km1 = P_k_k
 
+    return x_hist
+
+def BPF(y, x0, P0, Q, R):
+    '''
+    Temp
+    '''
+    x_hist = np.zeros((len(y), 3))
+    x_km1_km1 = x0
+    P_km1_km1 = P0
+
+    for i, y_k in enumerate(y):
+        if i == 0:
+            x_hist[0, :] = np.atleast_2d(x0).T
+        else:
+            # Prediction Step
+            
+
+            # Correction Step
+            
+
+            # Saving and reseting values
+            x_hist[i, :] = np.atleast_2d(x_k_k).T
+            x_km1_km1 = x_k_k
+            P_km1_km1 = P_k_k
+            
     return x_hist
 
 def make_pretty_plot(time, x_hist, h_k, s_k, Cb_k):
