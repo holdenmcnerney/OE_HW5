@@ -184,32 +184,33 @@ def BPF(y, x0, P0, Q, R):
     for i, y_k in enumerate(y):
         if i == 0:
             x_hist[0, :] = np.atleast_2d(x0).T
+            w_vec = [1/num_p] * num_p
+            x_km1_km1 = [x_km1_km1] * num_p
         else:
             # Sample
-            w_vec = [1/num_p] * num_p
             wk_vec = []
-            x_km1_km1_list = [x[0] for x in list(x_km1_km1)]
-            rv = multivariate_normal(mean=x_km1_km1_list, cov=Q)
             x_k_km1 = []
-            for i in range(num_p):
+            for idx in range(num_p):
+                x_km1_km1_list = [x[0] for x in list(x_km1_km1[idx])]
                 x_k_km1.append(multivariate_normal.rvs(mean=x_km1_km1_list, cov=Q))
             # Compute weights
             pass
-            for i in range(num_p):
-                wk_vec.append((multivariate_normal.rvs(mean=(y_k - np.sqrt(d**2 + x_k_km1[i][0]**2)), cov=R)) * w_vec[i])
+            for idx in range(num_p):
+                wk_vec.append((multivariate_normal.rvs(mean=(y_k - np.sqrt(d**2 + x_k_km1[idx][0]**2)), cov=R)) * w_vec[idx])
             # Normalize weights
             wk_sum = sum(wk_vec)
             wk_norm_vec = []
-            for i in range(num_p):
-                wk_norm_vec.append(wk_vec[i] / wk_sum)
+            for idx in range(num_p):
+                wk_norm_vec.append(wk_vec[idx] / wk_sum)
             # Resample
             x_k_k = []
-            for i in range(num_p):
+            for idx in range(num_p):
                 ri = uniform.rvs()
                 for j in range(num_p):
                     if sum(wk_norm_vec[0:j]) >= ri:
                         x_k_k.append(x_k_km1[j])
                         break
+            w_vec = [1/num_p] * num_p
             # Output optimal state estimate
             x_PF = 1 / num_p * sum(x_k_k)
             P_sum = np.zeros((3, 3))
@@ -217,7 +218,6 @@ def BPF(y, x0, P0, Q, R):
                 P_sum += (x_k - x_PF) @ (x_k - x_PF).T
             P_PF = 1 / (num_p - 1) * P_sum
 
-            pass
             # Saving and reseting values
             x_hist[i, :] = x_PF
             x_km1_km1 = np.atleast_2d(x_PF).T
