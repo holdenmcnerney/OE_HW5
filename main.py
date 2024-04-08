@@ -6,6 +6,7 @@ import scipy as sp
 import scipy.linalg as spla
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+from scipy.stats import multivariate_normal, uniform
 
 def f_km1_build(h_km1, s_km1, Cb_km1):
     f_km1 = np.array([[h_km1 + dt * s_km1], 
@@ -78,7 +79,7 @@ def calc_sg_pts(x_aug, P_aug):
     '''
     alpha = 1
     beta = 2
-    kappa = 0
+    kappa = 1
     na = P_aug.shape[0]
     lamb = alpha**2 * (na + kappa) - na
     sg_pts = []
@@ -178,22 +179,50 @@ def BPF(y, x0, P0, Q, R):
     x_hist = np.zeros((len(y), 3))
     x_km1_km1 = x0
     P_km1_km1 = P0
+    num_p = 50
 
     for i, y_k in enumerate(y):
         if i == 0:
             x_hist[0, :] = np.atleast_2d(x0).T
         else:
-            # Prediction Step
-            
+            # Sample
+            w_vec = [1/num_p] * num_p
+            wk_vec = []
+            x_km1_km1_list = [x[0] for x in list(x_km1_km1)]
+            rv = multivariate_normal(mean=x_km1_km1_list, cov=Q)
+            x_k_km1 = []
+            for i in range(num_p):
+                x_k_km1.append(multivariate_normal.rvs(mean=x_km1_km1_list, cov=Q))
+            # Compute weights
+            pass
+            for i in range(num_p):
+                wk_vec.append((multivariate_normal.rvs(mean=(y_k - np.sqrt(d**2 + x_k_km1[i][0]**2)), cov=R)) * w_vec[i])
+            # Normalize weights
+            wk_sum = sum(wk_vec)
+            wk_norm_vec = []
+            for i in range(num_p):
+                wk_norm_vec.append(wk_vec[i] / wk_sum)
+            # Resample
+            x_k_k = []
+            for i in range(num_p):
+                ri = uniform.rvs()
+                for j in range(num_p):
+                    if sum(wk_norm_vec[0:j]) >= ri:
+                        x_k_k.append(x_k_km1[j])
+                        break
+            # Output optimal state estimate
+            x_PF = 1 / num_p * sum(x_k_k)
+            P_sum = np.zeros((3, 3))
+            for x_k in x_k_k:
+                P_sum += (x_k - x_PF) @ (x_k - x_PF).T
+            P_PF = 1 / (num_p - 1) * P_sum
 
-            # Correction Step
-            
-
+            pass
             # Saving and reseting values
-            x_hist[i, :] = np.atleast_2d(x_k_k).T
-            x_km1_km1 = x_k_k
-            P_km1_km1 = P_k_k
-            
+            x_hist[i, :] = x_PF
+            x_km1_km1 = np.atleast_2d(x_PF).T
+            P_km1_km1 = P_PF
+
     return x_hist
 
 def make_pretty_plot(time, x_hist, h_k, s_k, Cb_k):
@@ -239,10 +268,12 @@ def main():
     P0 = np.diagflat((100**2, 10**2, 1**2))     # [ft^2, ft^2/s^2, lb^2/ft^2]
 
     # EKF_x_hist = EKF(y_k, x0, P0, Q, R)
-    SP_UKF_x_hist = SP_UKF(y_k, x0, P0, Q, R)
+    # SP_UKF_x_hist = SP_UKF(y_k, x0, P0, Q, R)
+    BKF_x_hist = BPF(y_k, x0, P0, Q, R)
 
     # make_pretty_plot(time, EKF_x_hist, h_k, s_k, Cb_k)
-    make_pretty_plot(time, SP_UKF_x_hist, h_k, s_k, Cb_k)
+    # make_pretty_plot(time, SP_UKF_x_hist, h_k, s_k, Cb_k)
+    make_pretty_plot(time, BKF_x_hist, h_k, s_k, Cb_k)
 
     return 0
 
