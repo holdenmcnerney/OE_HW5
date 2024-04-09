@@ -185,42 +185,43 @@ def BPF(y, x0, P0, Q, R):
         if i == 0:
             x_hist[0, :] = np.atleast_2d(x0).T
             w_vec = [1/num_p] * num_p
-            x_km1_km1 = [x_km1_km1] * num_p
+            x_km1_km1_vec = [x_km1_km1] * num_p
         else:
             # Sample
             wk_vec = []
-            x_k_km1 = []
-            for idx in range(num_p):
-                x_km1_km1_list = [x[0] for x in list(x_km1_km1[idx])]
-                x_k_km1.append(multivariate_normal.rvs(mean=x_km1_km1_list, cov=Q))
+            x_k_km1_vec = []
+            for x_km1_km1 in x_km1_km1_vec:
+                x_km1_km1_list = [x[0] for x in list(x_km1_km1)]
+                x_k_km1_vec.append(multivariate_normal.rvs(mean=x_km1_km1_list, cov=Q))
             # Compute weights
             pass
-            for idx in range(num_p):
-                wk_vec.append((multivariate_normal.rvs(mean=(y_k - np.sqrt(d**2 + x_k_km1[idx][0]**2)), cov=R)) * w_vec[idx])
+            for x_k_km1, w in zip(x_k_km1_vec, w_vec):
+                wk_vec.append((multivariate_normal.rvs(mean=(y_k - np.sqrt(d**2 + x_k_km1[0]**2)), cov=R)) * w)
             # Normalize weights
             wk_sum = sum(wk_vec)
             wk_norm_vec = []
-            for idx in range(num_p):
-                wk_norm_vec.append(wk_vec[idx] / wk_sum)
+            for wk in wk_vec:
+                wk_norm_vec.append(wk / wk_sum)
             # Resample
-            x_k_k = []
+            x_k_k_vec = []
             for idx in range(num_p):
                 ri = uniform.rvs()
                 for j in range(num_p):
                     if sum(wk_norm_vec[0:j]) >= ri:
-                        x_k_k.append(x_k_km1[j])
+                        x_k_k_vec.append(x_k_km1_vec[j])
                         break
             w_vec = [1/num_p] * num_p
             # Output optimal state estimate
-            x_PF = 1 / num_p * sum(x_k_k)
+            x_PF = 1 / num_p * sum(x_k_k_vec)
             P_sum = np.zeros((3, 3))
-            for x_k in x_k_k:
+            for x_k in x_k_k_vec:
                 P_sum += (x_k - x_PF) @ (x_k - x_PF).T
             P_PF = 1 / (num_p - 1) * P_sum
 
             # Saving and reseting values
             x_hist[i, :] = x_PF
             x_km1_km1 = np.atleast_2d(x_PF).T
+            x_km1_km1_vec = [x_km1_km1] * num_p
             P_km1_km1 = P_PF
 
     return x_hist
