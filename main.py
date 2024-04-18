@@ -190,12 +190,12 @@ def BPF(y, x0, P0, Q, R):
             # Sample
             wk_vec = []
             x_k_km1_vec = []
-            x_k = f_km1_build(x_km1_km1[0][0], x_km1_km1[1][0], x_km1_km1[2][0])
-            x_k_list = [x[0] for x in list(x_k)]
+            # x_k = f_km1_build(x_km1_km1[0][0], x_km1_km1[1][0], x_km1_km1[2][0])
+            # x_k_list = [x[0] for x in list(x_k)]
             for x_km1_km1 in x_km1_km1_vec:
                 x_k_km1 = f_km1_build(x_km1_km1[0][0], x_km1_km1[1][0], x_km1_km1[2][0])
                 x_k_km1_list = [x[0] for x in list(x_k_km1)]
-                x_diff = [xk - xkm1 for xk, xkm1 in zip(x_k_list, x_k_km1_list)]
+                # x_diff = [xk - xkm1 for xk, xkm1 in zip(x_k_list, x_k_km1_list)]
                 # x_k_km1_vec.append(np.atleast_2d(multivariate_normal.rvs(mean=x_diff, cov=Q)).T)
                 x_k_km1_vec.append(np.atleast_2d(multivariate_normal.rvs(mean=x_k_km1_list, cov=Q)).T)
             # Compute weights
@@ -209,7 +209,7 @@ def BPF(y, x0, P0, Q, R):
             # Resample
             # print(f'''presample length: {len(x_k_km1_vec)}''')
             x_k_k_vec = []
-            for idx in range(0, num_p):
+            for _ in range(0, num_p):
                 ri = uniform.rvs()
                 for j in range(0, num_p):
                     if sum(wk_norm_vec[0:j]) >= ri:
@@ -219,9 +219,9 @@ def BPF(y, x0, P0, Q, R):
             # Output optimal state estimate
             # print(f'''postsample length: {len(x_k_k_vec)}''')
 
-            # Temp fix to losing particles
+            # Temporary fix to losing particles
             if len(x_k_k_vec) < num_p:
-                for jdx in range(0, num_p - len(x_k_k_vec)):
+                for _ in range(0, num_p - len(x_k_k_vec)):
                     x_k_k_vec.append(x_k_km1_vec[0])
             # print(f'''post post sample length: {len(x_k_k_vec)}''')
 
@@ -235,7 +235,6 @@ def BPF(y, x0, P0, Q, R):
             x_hist[i, :] = np.atleast_2d(x_PF).T
             x_km1_km1 = x_PF
             x_km1_km1_vec = x_k_k_vec
-            # x_km1_km1_vec = [x_km1_km1] * num_p
             P_km1_km1 = P_PF
 
     return x_hist
