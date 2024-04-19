@@ -191,10 +191,12 @@ def BPF(y, x0, P0, Q, R):
             for x_km1_km1 in x_km1_km1_vec:
                 x_k_km1 = f_km1_build(x_km1_km1[0][0], x_km1_km1[1][0], x_km1_km1[2][0])
                 x_k_km1_list = [x[0] for x in list(x_k_km1)]
-                x_k_km1_vec.append(np.atleast_2d(multivariate_normal.rvs(mean=x_k_km1_list, cov=Q)).T)
+                x_k_km1_samp = multivariate_normal.rvs(mean=x_k_km1_list, cov=Q)
+                x_k_km1_vec.append(np.atleast_2d(x_k_km1_samp).T)
             # Compute weights
             for x_k_km1, w in zip(x_k_km1_vec, w_vec):
-                wk_vec.append((multivariate_normal.rvs(mean=(y_k - np.sqrt(d**2 + x_k_km1[0]**2)), cov=R)) * w)
+                y_diff = y_k - np.sqrt(d**2 + x_k_km1[0]**2)
+                wk_vec.append((multivariate_normal.rvs(mean=y_diff, cov=R)) * w)
             # Normalize weights
             wk_sum = sum(wk_vec)
             wk_norm_vec = []
@@ -209,7 +211,7 @@ def BPF(y, x0, P0, Q, R):
                         x_k_k_vec.append(x_k_km1_vec[j])
                         break
             w_vec = [1/num_p] * num_p
-            # Temporary fix to losing particles
+            # Fix to losing particles while resampling
             if len(x_k_k_vec) < num_p:
                 for _ in range(0, num_p - len(x_k_k_vec)):
                     x_k_k_vec.append(x_k_km1_vec[0])
