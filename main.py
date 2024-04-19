@@ -1,14 +1,14 @@
 # Optimal Estimation - HW5 - Ballistic Vehicle Altimetry System Design
 
 import numpy as np
-import numpy.linalg as npla
-import scipy as sp
 import scipy.linalg as spla
-import matplotlib as mpl
 import matplotlib.pyplot as plt
 from scipy.stats import multivariate_normal, uniform
 
 def f_km1_build(h_km1, s_km1, Cb_km1):
+    '''
+    Temp
+    '''
     f_km1 = np.array([[h_km1 + dt * s_km1], 
                      [s_km1 + dt * (rho0 * s_km1**2 / (2 * Cb_km1) * np.exp(-h_km1 / hp)
                                     - g0 * (RE / (RE + h_km1))**2)], 
@@ -55,17 +55,13 @@ def EKF(y, x0, P0, Q, R):
             P_k_km1 = F_km1 @ P_km1_km1 @ F_km1.T + Q
             h_k_km1 = x_k_km1[0][0]
             y_k_est = np.sqrt(d**2 + h_k_km1**2) 
-
             # Correction Step
             y_diff = y_k - y_k_est
             H_km1 = np.atleast_2d(H_km1_build(h_km1))
             S_k = H_km1 @ P_k_km1 @ H_km1.T + R
             K_k = P_k_km1 @ H_km1.T * S_k**-1
             x_k_k = x_k_km1 + K_k * y_diff
-            # A = np.eye(3) - K_k @ H_km1
-            # P_k_k = A @ P_k_km1 @ A.T + K_k * R @ K_k.T
             P_k_k = P_k_km1 - K_k @ S_k * K_k.T
-
             # Saving and reseting values
             x_hist[i, :] = np.atleast_2d(x_k_k).T
             x_km1_km1 = x_k_k
@@ -102,6 +98,9 @@ def calc_sg_pts(x_aug, P_aug):
     return sg_pts, wm_vec, wc_vec
 
 def prop_sg_pts(sg_pts):
+    '''
+    Temp
+    '''
     p_sg_pts = []
     for sg_pt in sg_pts:
         h = sg_pt[0][0]
@@ -178,7 +177,6 @@ def BPF(y, x0, P0, Q, R):
     '''
     x_hist = np.zeros((len(y), 3))
     x_km1_km1 = x0
-    P_km1_km1 = P0
     num_p = 10
 
     for i, y_k in enumerate(y):
@@ -190,13 +188,9 @@ def BPF(y, x0, P0, Q, R):
             # Sample
             wk_vec = []
             x_k_km1_vec = []
-            # x_k = f_km1_build(x_km1_km1[0][0], x_km1_km1[1][0], x_km1_km1[2][0])
-            # x_k_list = [x[0] for x in list(x_k)]
             for x_km1_km1 in x_km1_km1_vec:
                 x_k_km1 = f_km1_build(x_km1_km1[0][0], x_km1_km1[1][0], x_km1_km1[2][0])
                 x_k_km1_list = [x[0] for x in list(x_k_km1)]
-                # x_diff = [xk - xkm1 for xk, xkm1 in zip(x_k_list, x_k_km1_list)]
-                # x_k_km1_vec.append(np.atleast_2d(multivariate_normal.rvs(mean=x_diff, cov=Q)).T)
                 x_k_km1_vec.append(np.atleast_2d(multivariate_normal.rvs(mean=x_k_km1_list, cov=Q)).T)
             # Compute weights
             for x_k_km1, w in zip(x_k_km1_vec, w_vec):
@@ -207,7 +201,6 @@ def BPF(y, x0, P0, Q, R):
             for wk in wk_vec:
                 wk_norm_vec.append(wk / wk_sum)
             # Resample
-            # print(f'''presample length: {len(x_k_km1_vec)}''')
             x_k_k_vec = []
             for _ in range(0, num_p):
                 ri = uniform.rvs()
@@ -216,15 +209,11 @@ def BPF(y, x0, P0, Q, R):
                         x_k_k_vec.append(x_k_km1_vec[j])
                         break
             w_vec = [1/num_p] * num_p
-            # Output optimal state estimate
-            # print(f'''postsample length: {len(x_k_k_vec)}''')
-
             # Temporary fix to losing particles
             if len(x_k_k_vec) < num_p:
                 for _ in range(0, num_p - len(x_k_k_vec)):
                     x_k_k_vec.append(x_k_km1_vec[0])
-            # print(f'''post post sample length: {len(x_k_k_vec)}''')
-
+            # Output optimal state estimate
             x_PF = 1 / num_p * sum(x_k_k_vec)
             P_sum = np.zeros((3, 3))
             for x_k in x_k_k_vec:
@@ -235,21 +224,52 @@ def BPF(y, x0, P0, Q, R):
             x_hist[i, :] = np.atleast_2d(x_PF).T
             x_km1_km1 = x_PF
             x_km1_km1_vec = x_k_k_vec
-            P_km1_km1 = P_PF
 
     return x_hist
 
-def make_pretty_plot(time, x_hist, h_k, s_k, Cb_k):
+def make_pretty_plot(filter, time, x_hist, h_k, s_k, Cb_k):
     '''
     Temp
     '''
-    _, ax = plt.subplots((3))
-    ax[0].plot(time, x_hist[:, 0], color='g', label='Estimate')
+    fig, ax = plt.subplots((3), figsize=(10, 8))
+    fig.align_ylabels()
+    fig.suptitle(filter)
+    ax[0].set_ylabel(r'Altitude (h), $ft$')
+    ax[0].plot(time, x_hist[:, 0], color='g', label=f'''Estimate''')
     ax[0].plot(time, h_k, color='y', label='True Value')
+    ax[1].set_ylabel(r'Vertical Velocity (s), $ft/s$')
     ax[1].plot(time, x_hist[:, 1], color='g', label='Estimate')
     ax[1].plot(time, s_k, color='y', label='True Value')
+    ax[2].set_ylabel(r'Ballistic Cofficient ($C_b$), $lb/ft^2$')
+    ax[2].set_xlabel(r'Time, $s$')
     ax[2].plot(time, x_hist[:, 2], color='g', label='Estimate')
     ax[2].plot(time, Cb_k, color='y', label='True Value')
+    ax[0].legend()
+    ax[1].legend()
+    ax[2].legend()
+    plt.show()
+    return 0
+
+def error_comp_plots(time, h_k, s_k, Cb_k, EKF_x_hist, SP_UKF_x_hist, BPF_x_hist):
+    '''
+    Temp
+    '''
+    fig, ax = plt.subplots((3), figsize=(10, 8))
+    fig.align_ylabels()
+    fig.suptitle('State Error Across 3 Filters')
+    ax[0].set_ylabel(r'Altitude Error (h), $ft$')
+    ax[0].plot(time, EKF_x_hist[:, 0] - h_k, color='r', label='EFK Error')
+    ax[0].plot(time, SP_UKF_x_hist[:, 0] - h_k, color='g', label='SPF Error')
+    ax[0].plot(time, BPF_x_hist[:, 0] - h_k, color='y', label='BPF Error')
+    ax[1].set_ylabel(r'Vertical Velocity Error (s), $ft/s$')
+    ax[1].plot(time, EKF_x_hist[:, 1] - s_k, color='r', label='EFK Error')
+    ax[1].plot(time, SP_UKF_x_hist[:, 1] - s_k, color='g', label='SPF Error')
+    ax[1].plot(time, BPF_x_hist[:, 1] - s_k, color='y', label='BPF Error')
+    ax[2].set_ylabel(r'Ballistic Cofficient Error ($C_b$), $lb/ft^2$')
+    ax[2].set_xlabel(r'Time, $s$')
+    ax[2].plot(time, EKF_x_hist[:, 2] - Cb_k, color='r', label='EFK Error')
+    ax[2].plot(time, SP_UKF_x_hist[:, 2] - Cb_k, color='g', label='SPF Error')
+    ax[2].plot(time, BPF_x_hist[:, 2] - Cb_k, color='y', label='BPF Error')
     ax[0].legend()
     ax[1].legend()
     ax[2].legend()
@@ -280,15 +300,17 @@ def main():
     R = 100**2                                  # ft^2
     x0 = np.array([[400_000], [-2_000], [20]])  # [[ft], [ft/s], [lb/ft^2]]
     P0 = np.diagflat((100**2, 10**2, 1**2))     # [ft^2, ft^2/s^2, lb^2/ft^2]
-
-    # EKF_x_hist = EKF(y_k, x0, P0, Q, R)
-    # SP_UKF_x_hist = SP_UKF(y_k, x0, P0, Q, R)
-    BKF_x_hist = BPF(y_k, x0, P0, Q, R)
-
-    # make_pretty_plot(time, EKF_x_hist, h_k, s_k, Cb_k)
-    # make_pretty_plot(time, SP_UKF_x_hist, h_k, s_k, Cb_k)
-    make_pretty_plot(time, BKF_x_hist, h_k, s_k, Cb_k)
-
+    # Generating state trajectories for all filters
+    EKF_x_hist = EKF(y_k, x0, P0, Q, R)
+    SP_UKF_x_hist = SP_UKF(y_k, x0, P0, Q, R)
+    BPF_x_hist = BPF(y_k, x0, P0, Q, R)
+    ekf = 'Extended Kalman Filter'
+    spf = 'Sigma Point Filter'
+    bpf = 'Bootstrap Particle Filter'
+    make_pretty_plot(ekf, time, EKF_x_hist, h_k, s_k, Cb_k)
+    make_pretty_plot(spf, time, SP_UKF_x_hist, h_k, s_k, Cb_k)
+    make_pretty_plot(bpf, time, BPF_x_hist, h_k, s_k, Cb_k)
+    error_comp_plots(time, h_k, s_k, Cb_k, EKF_x_hist, SP_UKF_x_hist, BPF_x_hist)
     return 0
 
 if __name__=='__main__':
