@@ -7,7 +7,7 @@ from scipy.stats import multivariate_normal, uniform
 
 def f_km1_build(h_km1, s_km1, Cb_km1):
     '''
-    Temp
+    Builds nonlinear f result.
     '''
     f_km1 = np.array([[h_km1 + dt * s_km1], 
                      [s_km1 + dt * (rho0 * s_km1**2 / (2 * Cb_km1) * np.exp(-h_km1 / hp)
@@ -17,7 +17,7 @@ def f_km1_build(h_km1, s_km1, Cb_km1):
 
 def F_km1_build(h_km1, s_km1, Cb_km1):
     '''
-    Temp
+    Builds linear F matrix result.
     '''
     F_km1 = np.array([[1, dt, 0], 
                       [dt * (- rho0 * s_km1**2 / (2 * Cb_km1 * hp) * np.exp(-h_km1 / hp)
@@ -29,14 +29,14 @@ def F_km1_build(h_km1, s_km1, Cb_km1):
 
 def H_km1_build(h_km1):
     '''
-    Temp
+    Builds nonlinear H result.
     '''
     H_km1 = np.array([h_km1 * (d**2 + h_km1**2)**(-1/2), 0, 0])
     return H_km1
 
 def EKF(y, x0, P0, Q, R):
     '''
-    Temp
+    Runs an extended kalman filter and output state trajectory history.
     '''
     x_hist = np.zeros((len(y), 3))
     x_km1_km1 = x0
@@ -71,7 +71,7 @@ def EKF(y, x0, P0, Q, R):
 
 def calc_sg_pts(x_aug, P_aug):
     '''
-    Temp
+    Calculates sigma points.
     '''
     alpha = 1
     beta = 2
@@ -99,7 +99,7 @@ def calc_sg_pts(x_aug, P_aug):
 
 def prop_sg_pts(sg_pts):
     '''
-    Temp
+    Propogates sigma points through nonlinear dynamics equations
     '''
     p_sg_pts = []
     for sg_pt in sg_pts:
@@ -111,7 +111,8 @@ def prop_sg_pts(sg_pts):
 
 def SP_UKF(y, x0, P0, Q, R):
     '''
-    Temp
+    Runs a sigma point unscented kalman filter and output state trajectory 
+    history.
     '''
     x_hist = np.zeros((len(y), 3))
     x_km1_km1 = x0
@@ -173,7 +174,7 @@ def SP_UKF(y, x0, P0, Q, R):
 
 def BPF(y, x0, P0, Q, R):
     '''
-    Temp
+    Runs a bootstrap particle filter and output state trajectory history.
     '''
     x_hist = np.zeros((len(y), 3))
     x_km1_km1 = x0
@@ -231,7 +232,7 @@ def BPF(y, x0, P0, Q, R):
 
 def make_pretty_plot(filter, time, x_hist, h_k, s_k, Cb_k):
     '''
-    Temp
+    Makes plots for comparing state trajectory history to true values.
     '''
     fig, ax = plt.subplots((3), figsize=(10, 8))
     fig.align_ylabels()
@@ -254,7 +255,7 @@ def make_pretty_plot(filter, time, x_hist, h_k, s_k, Cb_k):
 
 def error_comp_plots(time, h_k, s_k, Cb_k, EKF_x_hist, SP_UKF_x_hist, BPF_x_hist):
     '''
-    Temp
+    Makes plots for comparing state trajectory error history between filters.
     '''
     fig, ax = plt.subplots((3), figsize=(10, 8))
     fig.align_ylabels()
@@ -280,7 +281,7 @@ def error_comp_plots(time, h_k, s_k, Cb_k, EKF_x_hist, SP_UKF_x_hist, BPF_x_hist
 
 def main():
     '''
-    Temp
+    Main function for setting variables and running filters.
     '''
     # Load Data
     data = np.loadtxt('altimeter_data.csv', delimiter=',')
