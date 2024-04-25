@@ -195,13 +195,8 @@ def BPF(y, x0, P0, Q, R):
             # Normalize weights
             wk_sum = sum(wk_vec)
             wk_norm_vec = []
-            flag = 0
             for wk in wk_vec:
-                if wk / wk_sum < 0:
-                    flag = 1
                 wk_norm_vec.append(wk / wk_sum)
-            if flag == 1:
-                print(wk_norm_vec)
             # Resample
             x_k_k_vec = []
             for _ in range(0, num_p):
