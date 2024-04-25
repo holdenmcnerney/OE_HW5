@@ -34,41 +34,6 @@ def H_km1_build(h_km1):
     H_km1 = np.array([h_km1 * (d**2 + h_km1**2)**(-1/2), 0, 0])
     return H_km1
 
-def EKF(y, x0, P0, Q, R):
-    '''
-    Runs an extended kalman filter and output state trajectory history.
-    '''
-    x_hist = np.zeros((len(y), 3))
-    x_km1_km1 = x0
-    P_km1_km1 = P0
-
-    for i, y_k in enumerate(y):
-        if i == 0:
-            x_hist[0, :] = np.atleast_2d(x0).T
-        else:
-            # Prediction Step
-            h_km1 = x_km1_km1[0][0]
-            s_km1 = x_km1_km1[1][0]
-            Cb_km1 = x_km1_km1[2][0]
-            x_k_km1 = f_km1_build(h_km1, s_km1, Cb_km1)
-            F_km1 = F_km1_build(h_km1, s_km1, Cb_km1)
-            P_k_km1 = F_km1 @ P_km1_km1 @ F_km1.T + Q
-            h_k_km1 = x_k_km1[0][0]
-            y_k_est = np.sqrt(d**2 + h_k_km1**2) 
-            # Correction Step
-            y_diff = y_k - y_k_est
-            H_km1 = np.atleast_2d(H_km1_build(h_km1))
-            S_k = H_km1 @ P_k_km1 @ H_km1.T + R
-            K_k = P_k_km1 @ H_km1.T * S_k**-1
-            x_k_k = x_k_km1 + K_k * y_diff
-            P_k_k = P_k_km1 - K_k @ S_k * K_k.T
-            # Saving and reseting values
-            x_hist[i, :] = np.atleast_2d(x_k_k).T
-            x_km1_km1 = x_k_k
-            P_km1_km1 = P_k_k
-
-    return x_hist
-
 def calc_sg_pts(x_aug, P_aug):
     '''
     Calculates sigma points.
@@ -109,6 +74,39 @@ def prop_sg_pts(sg_pts):
         p_sg_pts.append(f_km1_build(h, s, Cb))
     return p_sg_pts
 
+def EKF(y, x0, P0, Q, R):
+    '''
+    Runs an extended kalman filter and output state trajectory history.
+    '''
+    x_hist = np.zeros((len(y), 3))
+    x_km1_km1 = x0
+    P_km1_km1 = P0
+    for i, y_k in enumerate(y):
+        if i == 0:
+            x_hist[0, :] = np.atleast_2d(x0).T
+        else:
+            # Prediction Step
+            h_km1 = x_km1_km1[0][0]
+            s_km1 = x_km1_km1[1][0]
+            Cb_km1 = x_km1_km1[2][0]
+            x_k_km1 = f_km1_build(h_km1, s_km1, Cb_km1)
+            F_km1 = F_km1_build(h_km1, s_km1, Cb_km1)
+            P_k_km1 = F_km1 @ P_km1_km1 @ F_km1.T + Q
+            h_k_km1 = x_k_km1[0][0]
+            y_k_est = np.sqrt(d**2 + h_k_km1**2) 
+            # Correction Step
+            y_diff = y_k - y_k_est
+            H_km1 = np.atleast_2d(H_km1_build(h_km1))
+            S_k = H_km1 @ P_k_km1 @ H_km1.T + R
+            K_k = P_k_km1 @ H_km1.T * S_k**-1
+            x_k_k = x_k_km1 + K_k * y_diff
+            P_k_k = P_k_km1 - K_k @ S_k * K_k.T
+            # Saving and reseting values
+            x_hist[i, :] = np.atleast_2d(x_k_k).T
+            x_km1_km1 = x_k_k
+            P_km1_km1 = P_k_k
+    return x_hist
+
 def SP_UKF(y, x0, P0, Q, R):
     '''
     Runs a sigma point unscented kalman filter and output state trajectory 
@@ -117,7 +115,6 @@ def SP_UKF(y, x0, P0, Q, R):
     x_hist = np.zeros((len(y), 3))
     x_km1_km1 = x0
     P_km1_km1 = P0
-
     for i, y_k in enumerate(y):
         if i == 0:
             x_hist[0, :] = np.atleast_2d(x0).T
@@ -139,7 +136,6 @@ def SP_UKF(y, x0, P0, Q, R):
             P_k_km1 = np.zeros((3, 3))
             for (sg_pt, w) in zip(p_sg_pts, wc_vec):
                 P_k_km1 += w * (sg_pt[0:3] - x_k_km1) @ (sg_pt[0:3] - x_k_km1).T
-            
             # Correction Step
             x_aug_c = np.block([[x_k_km1], [np.zeros((3, 1))], [0]])
             P_aug_c = np.block([[P_k_km1, np.zeros((3, 4))], 
@@ -164,12 +160,10 @@ def SP_UKF(y, x0, P0, Q, R):
             K_k = P_xy * P_y**-1
             x_k_k = x_k_km1 + K_k * (y_k - y_k_est)
             P_k_k = P_k_km1 - K_k * P_y @ K_k.T
-
             # Saving and reseting values
             x_hist[i, :] = np.atleast_2d(x_k_k).T
             x_km1_km1 = x_k_k
             P_km1_km1 = P_k_k
-
     return x_hist
 
 def BPF(y, x0, P0, Q, R):
@@ -179,7 +173,6 @@ def BPF(y, x0, P0, Q, R):
     x_hist = np.zeros((len(y), 3))
     x_km1_km1 = x0
     num_p = 10
-
     for i, y_k in enumerate(y):
         if i == 0:
             x_hist[0, :] = np.atleast_2d(x0).T
@@ -197,12 +190,18 @@ def BPF(y, x0, P0, Q, R):
             # Compute weights
             for x_k_km1, w in zip(x_k_km1_vec, w_vec):
                 y_diff = y_k - np.sqrt(d**2 + x_k_km1[0]**2)
-                wk_vec.append((multivariate_normal.rvs(mean=y_diff, cov=R)) * w)
+                rand_samp = multivariate_normal.rvs(mean=y_diff, cov=R)
+                wk_vec.append(rand_samp * w)
             # Normalize weights
             wk_sum = sum(wk_vec)
             wk_norm_vec = []
+            flag = 0
             for wk in wk_vec:
+                if wk / wk_sum < 0:
+                    flag = 1
                 wk_norm_vec.append(wk / wk_sum)
+            if flag == 1:
+                print(wk_norm_vec)
             # Resample
             x_k_k_vec = []
             for _ in range(0, num_p):
@@ -221,13 +220,11 @@ def BPF(y, x0, P0, Q, R):
             P_sum = np.zeros((3, 3))
             for x_k in x_k_k_vec:
                 P_sum += (x_k - x_PF) @ (x_k - x_PF).T
-            P_PF = 1 / (num_p - 1) * P_sum
-
+            # P_PF = 1 / (num_p - 1) * P_sum
             # Saving and reseting values
             x_hist[i, :] = np.atleast_2d(x_PF).T
             x_km1_km1 = x_PF
             x_km1_km1_vec = x_k_k_vec
-
     return x_hist
 
 def make_pretty_plot(filter, time, x_hist, h_k, s_k, Cb_k):
